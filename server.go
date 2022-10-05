@@ -82,10 +82,10 @@ func (s *Server) Handler(conn net.Conn) {
 		case <-isLive:
 			//当前用户活跃，重置定时器
 			//不做任何事情，为了激活select，更新下面的定时器
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 60):
 			// 已经过时
 			// 将当前用户强制删除
-			user.SendMsg("超过10秒未操作，你被强制下线")
+			user.SendMsg("超过60秒未操作，你被强制下线")
 			// 销毁资源
 			close(user.C)
 			// 退出当前handler

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"strings"
 )
 
 type User struct {
@@ -61,13 +62,17 @@ func (u *User) DoMessage(msg string) {
 		//查询当前在线用户
 		u.server.mapLock.Lock()
 		for _, user := range u.server.OnlineMap {
-			onlineMsg := "[" + user.Addr + "]" + user.Name + "：在线...\n"
+			onlineMsg := "[" + user.Addr + "]" + user.Name + ":在线...\n"
 			u.SendMsg(onlineMsg)
 		}
 		u.server.mapLock.Unlock()
 	} else if len(msg) > 7 && msg[:7] == "rename|" {
-		//消息格式：rename|xx
+		//消息格式:rename|xx
 		newName := msg[7:]
+		if newName == "" {
+			u.SendMsg("用户名不能为空\n")
+			return
+		}
 		_, ok := u.server.OnlineMap[newName]
 		if ok {
 			u.SendMsg(newName + "已被占用\n")
@@ -77,8 +82,26 @@ func (u *User) DoMessage(msg string) {
 			u.server.OnlineMap[newName] = u
 			u.server.mapLock.Unlock()
 			u.Name = newName
-			u.SendMsg("修改成功，当前用户名：" + newName + "\n")
+			u.SendMsg("修改成功，当前用户名:" + newName + "\n")
 		}
+	} else if len(msg) > 4 && msg[:3] == "to|" {
+		//消息格式:to|xx|消息内容
+		remoteName := strings.Split(msg, "|")[1]
+		if remoteName == "" {
+			u.SendMsg("用户名不能为空\n")
+			return
+		}
+		remoteUser, ok := u.server.OnlineMap[remoteName]
+		if !ok {
+			u.SendMsg(remoteName + "不存在\n")
+			return
+		}
+		content := strings.Split(msg, "|")[2]
+		if content == "" {
+			u.SendMsg("发送消息内容不能为空\n")
+			return
+		}
+		remoteUser.SendMsg(u.Name + "对你说:" + content + "\n")
 	} else {
 		u.server.BroadCast(u, msg)
 	}

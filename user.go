@@ -28,63 +28,72 @@ func NewUser(conn net.Conn, server *Server) *User {
 }
 
 // Online 用户上线的业务
-func (this *User) Online() {
+func (u *User) Online() {
 	//用户上线，加入到OnlineMap中
-	this.server.mapLock.Lock()
-	this.server.OnlineMap[this.Name] = this
-	this.server.mapLock.Unlock()
+	u.server.mapLock.Lock()
+	u.server.OnlineMap[u.Name] = u
+	u.server.mapLock.Unlock()
 	//广播当前用户上线消息
-	this.server.BroadCast(this, "已上线")
+	u.server.BroadCast(u, "已上线")
 }
 
 // Offline 用户上线的业务
-func (this *User) Offline() {
+func (u *User) Offline() {
 	//用户下线，从OnlineMap中删除
-	this.server.mapLock.Lock()
-	delete(this.server.OnlineMap, this.Name)
-	this.server.mapLock.Unlock()
+	u.server.mapLock.Lock()
+	delete(u.server.OnlineMap, u.Name)
+	u.server.mapLock.Unlock()
 	//广播当前用户上线消息
-	this.server.BroadCast(this, "下线")
+	u.server.BroadCast(u, "下线")
 }
 
 // SendMsg 给当前用户对应的客户端发送消息
-func (this *User) SendMsg(msg string) {
-	this.conn.Write([]byte(msg))
+func (u *User) SendMsg(msg string) {
+	_, err := u.conn.Write([]byte(msg))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // DoMessage 用户处理消息的业务
-func (this *User) DoMessage(msg string) {
+func (u *User) DoMessage(msg string) {
 	if msg == "who" {
 		//查询当前在线用户
-		this.server.mapLock.Lock()
-		for _, user := range this.server.OnlineMap {
+		u.server.mapLock.Lock()
+		for _, user := range u.server.OnlineMap {
 			onlineMsg := "[" + user.Addr + "]" + user.Name + "：在线...\n"
-			this.SendMsg(onlineMsg)
+			u.SendMsg(onlineMsg)
 		}
-		this.server.mapLock.Unlock()
+		u.server.mapLock.Unlock()
 	} else if len(msg) > 7 && msg[:7] == "rename|" {
 		//消息格式：rename|xx
 		newName := msg[7:]
-		_, ok := this.server.OnlineMap[newName]
+		_, ok := u.server.OnlineMap[newName]
 		if ok {
-			this.SendMsg(newName + "已被占用\n")
+			u.SendMsg(newName + "已被占用\n")
 		} else {
-			this.server.mapLock.Lock()
-			delete(this.server.OnlineMap, this.Name)
-			this.server.OnlineMap[newName] = this
-			this.server.mapLock.Unlock()
-			this.Name = newName
-			this.SendMsg("修改成功，当前用户名：" + newName + "\n")
+			u.server.mapLock.Lock()
+			delete(u.server.OnlineMap, u.Name)
+			u.server.OnlineMap[newName] = u
+			u.server.mapLock.Unlock()
+			u.Name = newName
+			u.SendMsg("修改成功，当前用户名：" + newName + "\n")
 		}
 	} else {
-		this.server.BroadCast(this, msg)
+		u.server.BroadCast(u, msg)
 	}
 }
 
 // ListenMessage 监听当前User channel的方法，有消息就直接发送给客户端
-func (this *User) ListenMessage() {
-	for {
-		msg := <-this.C
-		this.conn.Write([]byte(msg + "\n"))
+func (u *User) ListenMessage() {
+	for msg := range u.C {
+		_, err := u.conn.Write([]byte(msg + "\n"))
+		if err != nil {
+			panic(err)
+		}
+	}
+	err := u.conn.Close()
+	if err != nil {
+		panic(err)
 	}
 }

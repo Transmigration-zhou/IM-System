@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -20,14 +21,14 @@ type Server struct {
 }
 
 // ListenMessage 监听Message广播消息channel的goroutine，有消息就直接发送给全部的在线user
-func (this *Server) ListenMessage() {
+func (s *Server) ListenMessage() {
 	for {
-		msg := <-this.Message
-		this.mapLock.Lock()
-		for _, client := range this.OnlineMap {
+		msg := <-s.Message
+		s.mapLock.Lock()
+		for _, client := range s.OnlineMap {
 			client.C <- msg
 		}
-		this.mapLock.Unlock()
+		s.mapLock.Unlock()
 	}
 }
 
@@ -43,15 +44,17 @@ func NewServer(ip string, port int) *Server {
 }
 
 // BroadCast 广播消息的方法
-func (this *Server) BroadCast(user *User, msg string) {
+func (s *Server) BroadCast(user *User, msg string) {
 	sendMsg := "[" + user.Addr + "]" + user.Name + ":" + msg
-	this.Message <- sendMsg
+	s.Message <- sendMsg
 }
 
-func (this *Server) Handler(conn net.Conn) {
+func (s *Server) Handler(conn net.Conn) {
 	fmt.Println("链接建立成功")
-	user := NewUser(conn, this)
+	user := NewUser(conn, s)
 	user.Online()
+	//监听用户是否活跃的channel
+	isLive := make(chan bool)
 	//接受客户端发送的消息
 	go func() {
 		buf := make([]byte, 4096)
@@ -69,24 +72,45 @@ func (this *Server) Handler(conn net.Conn) {
 			msg := string(buf[:n-1])
 			//用户针对msg进行消息处理
 			user.DoMessage(msg)
+			//用户的任意消息代表当前用户是活跃的
+			isLive <- true
 		}
 	}()
 	//当前handler阻塞
-	select {}
+	for {
+		select {
+		case <-isLive:
+			//当前用户活跃，重置定时器
+			//不做任何事情，为了激活select，更新下面的定时器
+		case <-time.After(time.Second * 10):
+			// 已经过时
+			// 将当前用户强制删除
+			user.SendMsg("超过10秒未操作，你被强制下线")
+			// 销毁资源
+			close(user.C)
+			// 退出当前handler
+			return
+		}
+	}
 }
 
 // Start 启动服务器的接口
-func (this *Server) Start() {
+func (s *Server) Start() {
 	//socket listen
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", this.Ip, this.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.Ip, s.Port))
 	if err != nil {
 		fmt.Println("net.Listen err:", err)
 		return
 	}
 	//close listen socket
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(listener)
 	//启动监听Message的goroutine
-	go this.ListenMessage()
+	go s.ListenMessage()
 	for {
 		//accept
 		conn, err := listener.Accept()
@@ -95,6 +119,6 @@ func (this *Server) Start() {
 			continue
 		}
 		//do handler
-		go this.Handler(conn)
+		go s.Handler(conn)
 	}
 }

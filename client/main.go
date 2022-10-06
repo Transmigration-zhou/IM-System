@@ -13,6 +13,8 @@ func main() {
 		fmt.Println(">>>>>连接服务器失败")
 		return
 	}
+	//单独开启一个goroutine去处理server返回的消息
+	go client.DealResponse()
 	fmt.Println(">>>>>连接服务器成功")
 	client.Run()
 }

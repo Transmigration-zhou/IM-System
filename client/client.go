@@ -60,6 +60,60 @@ func (client *Client) menu() bool {
 	}
 }
 
+func (client *Client) SelectUsers() {
+	sendMsg := "who\n"
+	_, err := client.conn.Write([]byte(sendMsg))
+	if err != nil {
+		fmt.Println("conn write error:", err)
+		return
+	}
+}
+
+func (client *Client) PrivateChat() {
+	var remoteName string
+	var chatMsg string
+
+	client.SelectUsers()
+	fmt.Println(">>>>>请输入聊天对象用户名, 输入exit退出")
+	_, err := fmt.Scanln(&remoteName)
+	if err != nil {
+		panic(err)
+		return
+	}
+	for remoteName != "exit" {
+		fmt.Println(">>>>>请输入聊天内容, 输入exit退出")
+		_, err = fmt.Scanln(&chatMsg)
+		if err != nil {
+			panic(err)
+			return
+		}
+		for chatMsg != "exit" {
+			if len(remoteName) != 0 {
+				sendMsg := "to|" + remoteName + "|" + chatMsg + "\n\n"
+				_, err = client.conn.Write([]byte(sendMsg))
+				if err != nil {
+					fmt.Println("conn write err", err)
+					break
+				}
+			}
+			chatMsg = ""
+			fmt.Println(">>>>>请输入聊天内容, 输入exit退出")
+			_, err = fmt.Scanln(&chatMsg)
+			if err != nil {
+				panic(err)
+				return
+			}
+		}
+		client.SelectUsers()
+		fmt.Println(">>>>>请输入聊天对象用户名, 输入exit退出")
+		_, err = fmt.Scanln(&remoteName)
+		if err != nil {
+			panic(err)
+			return
+		}
+	}
+}
+
 func (client *Client) PublicChat() {
 	var chatMsg string
 	fmt.Println(">>>>>请输入聊天内容, 输入exit退出")
@@ -68,14 +122,13 @@ func (client *Client) PublicChat() {
 		panic(err)
 		return
 	}
-
 	for chatMsg != "exit" {
 		// 消息不为空时发送
 		if len(chatMsg) != 0 {
 			sendMsg := chatMsg + "\n"
 			_, err = client.conn.Write([]byte(sendMsg))
 			if err != nil {
-				fmt.Println("conn.write error:", err)
+				fmt.Println("conn write error:", err)
 				break
 			}
 		}
@@ -102,7 +155,7 @@ func (client *Client) UpdateName() bool {
 		return false
 	}
 	if err != nil {
-		fmt.Println("con.Write error:", err)
+		fmt.Println("conn write error:", err)
 		return false
 	}
 	return true
@@ -116,7 +169,7 @@ func (client *Client) Run() {
 		case 1:
 			client.PublicChat()
 		case 2:
-			fmt.Println("私聊模式...")
+			client.PrivateChat()
 		case 3:
 			client.UpdateName()
 		}

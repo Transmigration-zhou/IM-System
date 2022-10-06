@@ -42,7 +42,7 @@ func (client *Client) DealResponse() {
 }
 func (client *Client) menu() bool {
 	var f int
-	fmt.Println("1.群聊模式")
+	fmt.Println("1.公聊模式")
 	fmt.Println("2.私聊模式")
 	fmt.Println("3.更新用户名")
 	fmt.Println("0.退出")
@@ -57,6 +57,35 @@ func (client *Client) menu() bool {
 	} else {
 		fmt.Println(">>>>>请输入合法范围内的数字<<<<<")
 		return false
+	}
+}
+
+func (client *Client) PublicChat() {
+	var chatMsg string
+	fmt.Println(">>>>>请输入聊天内容, 输入exit退出")
+	_, err := fmt.Scanln(&chatMsg)
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	for chatMsg != "exit" {
+		// 消息不为空时发送
+		if len(chatMsg) != 0 {
+			sendMsg := chatMsg + "\n"
+			_, err = client.conn.Write([]byte(sendMsg))
+			if err != nil {
+				fmt.Println("conn.write error:", err)
+				break
+			}
+		}
+		chatMsg = ""
+		fmt.Println(">>>>>请输入聊天内容, 输入exit退出")
+		_, err = fmt.Scanln(&chatMsg)
+		if err != nil {
+			panic(err)
+			return
+		}
 	}
 }
 
@@ -85,7 +114,7 @@ func (client *Client) Run() {
 		}
 		switch client.flag {
 		case 1:
-			fmt.Println("公聊模式...")
+			client.PublicChat()
 		case 2:
 			fmt.Println("私聊模式...")
 		case 3:
